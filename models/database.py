@@ -4,19 +4,42 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
 
-# Database URL from environment variable or use Railway credentials
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", 
-    "mysql+pymysql://root:PvpGKLmgCdZTynyRHzAKtKbHIlwjaWSj@shortline.proxy.rlwy.net:21428/railway"
-)
+# Build DATABASE_URL from environment variables
+DB_USER = os.getenv("DB_USER", "root")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT", "3306")
+DB_NAME = os.getenv("DB_NAME", "railway")
+
+# Validate required environment variables
+if not DB_PASSWORD:
+    raise ValueError("DB_PASSWORD environment variable is required")
+if not DB_HOST:
+    raise ValueError("DB_HOST environment variable is required")
+
+DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
+print(f"Connecting to database at {DB_HOST}:{DB_PORT}/{DB_NAME}")
 
 # Create engine with MySQL specific settings
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=3600,  # Recycle connections after 1 hour
-    echo=False  # Set to True for SQL query logging during development
-)
+try:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+        pool_size=5,
+        max_overflow=10,
+        echo=False,
+        connect_args={
+            "connect_timeout": 10,
+        }
+    )
+    # Test the connection
+    with engine.connect() as conn:
+        print("✓ Database connection successful!")
+except Exception as e:
+    print(f"✗ Database connection failed: {e}")
+    raise
 
 # Create session
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
