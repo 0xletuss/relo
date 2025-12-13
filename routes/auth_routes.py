@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from auth_models import UserSignUp, UserSignIn, AuthResponse, UserResponse, Token
-from database import get_db, User, RefreshToken
+from models.auth_models import UserSignUp, UserSignIn, AuthResponse, UserResponse, Token
+from models.database import get_db, User, RefreshToken
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
