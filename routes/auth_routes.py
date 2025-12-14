@@ -77,9 +77,11 @@ async def get_current_user(
         raise credentials_exception
     return user
 
-# Routes
+# Routes - FIXED ENDPOINTS
 @router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def sign_up(user_data: UserSignUp, db: Session = Depends(get_db)):
+    """Sign up endpoint - accessible via both /signup and /register"""
     # Check if username already exists
     if get_user_by_username(db, user_data.username):
         raise HTTPException(
@@ -130,9 +132,14 @@ async def sign_up(user_data: UserSignUp, db: Session = Depends(get_db)):
     )
 
 @router.post("/signin", response_model=AuthResponse)
+@router.post("/login", response_model=AuthResponse)
 async def sign_in(user_data: UserSignIn, db: Session = Depends(get_db)):
-    # Find user
+    """Sign in endpoint - accessible via both /signin and /login"""
+    # Find user by username OR email
     user = get_user_by_username(db, user_data.username)
+    if not user:
+        # Try email if username not found
+        user = get_user_by_email(db, user_data.username)
     
     if not user:
         raise HTTPException(
