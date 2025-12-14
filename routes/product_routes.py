@@ -8,7 +8,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from models.database import get_db
 from models.product_model import Product, Category, Cart, Wishlist, Order, OrderItem, StockStatus, OrderStatus
-from middleware.auth_middleware import get_current_user
+from routes.auth_routes import get_current_user  # Import from auth_routes instead
 import random
 import string
 from datetime import datetime
@@ -140,11 +140,11 @@ async def get_product(product_id: int, db: Session = Depends(get_db)):
 async def create_product(
     product: ProductCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """Create a new product (Admin only)"""
     # You can add admin check here if needed
-    # if not current_user.get("is_admin"):
+    # if not current_user.is_admin:
     #     raise HTTPException(status_code=403, detail="Not authorized")
     
     new_product = Product(**product.dict())
@@ -158,7 +158,7 @@ async def update_product(
     product_id: int,
     product_update: ProductUpdate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """Update a product (Admin only)"""
     product = db.query(Product).filter(Product.id == product_id).first()
@@ -176,7 +176,7 @@ async def update_product(
 async def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
     """Delete a product (Admin only)"""
     product = db.query(Product).filter(Product.id == product_id).first()
@@ -208,11 +208,11 @@ async def get_categories(db: Session = Depends(get_db)):
 
 @router.get("/cart")
 async def get_cart(
-    current_user: dict = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get current user's cart"""
-    cart_items = db.query(Cart).filter(Cart.customer_id == current_user["id"]).all()
+    cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
     
     total = sum(item.product.price * item.quantity for item in cart_items)
     
@@ -225,7 +225,7 @@ async def get_cart(
 @router.post("/cart", status_code=status.HTTP_201_CREATED)
 async def add_to_cart(
     cart_item: CartItemCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Add item to cart"""
@@ -236,7 +236,7 @@ async def add_to_cart(
     
     # Check if item already in cart
     existing_item = db.query(Cart).filter(
-        Cart.customer_id == current_user["id"],
+        Cart.customer_id == current_user.id,
         Cart.product_id == cart_item.product_id
     ).first()
     
@@ -249,7 +249,7 @@ async def add_to_cart(
     else:
         # Add new item
         new_cart_item = Cart(
-            customer_id=current_user["id"],
+            customer_id=current_user.id,
             product_id=cart_item.product_id,
             quantity=cart_item.quantity
         )
@@ -262,13 +262,13 @@ async def add_to_cart(
 async def update_cart_item(
     cart_item_id: int,
     cart_update: CartItemUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update cart item quantity"""
     cart_item = db.query(Cart).filter(
         Cart.id == cart_item_id,
-        Cart.customer_id == current_user["id"]
+        Cart.customer_id == current_user.id
     ).first()
     
     if not cart_item:
@@ -282,13 +282,13 @@ async def update_cart_item(
 @router.delete("/cart/{cart_item_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_from_cart(
     cart_item_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Remove item from cart"""
     cart_item = db.query(Cart).filter(
         Cart.id == cart_item_id,
-        Cart.customer_id == current_user["id"]
+        Cart.customer_id == current_user.id
     ).first()
     
     if not cart_item:
@@ -300,11 +300,11 @@ async def remove_from_cart(
 
 @router.delete("/cart", status_code=status.HTTP_204_NO_CONTENT)
 async def clear_cart(
-    current_user: dict = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Clear all items from cart"""
-    db.query(Cart).filter(Cart.customer_id == current_user["id"]).delete()
+    db.query(Cart).filter(Cart.customer_id == current_user.id).delete()
     db.commit()
     return None
 
@@ -314,12 +314,12 @@ async def clear_cart(
 
 @router.get("/wishlist")
 async def get_wishlist(
-    current_user: dict = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get current user's wishlist"""
     wishlist_items = db.query(Wishlist).filter(
-        Wishlist.customer_id == current_user["id"]
+        Wishlist.customer_id == current_user.id
     ).all()
     
     return {
@@ -330,7 +330,7 @@ async def get_wishlist(
 @router.post("/wishlist", status_code=status.HTTP_201_CREATED)
 async def add_to_wishlist(
     wishlist_item: WishlistItemCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Add item to wishlist"""
@@ -341,7 +341,7 @@ async def add_to_wishlist(
     
     # Check if already in wishlist
     existing = db.query(Wishlist).filter(
-        Wishlist.customer_id == current_user["id"],
+        Wishlist.customer_id == current_user.id,
         Wishlist.product_id == wishlist_item.product_id
     ).first()
     
@@ -349,7 +349,7 @@ async def add_to_wishlist(
         raise HTTPException(status_code=400, detail="Item already in wishlist")
     
     new_item = Wishlist(
-        customer_id=current_user["id"],
+        customer_id=current_user.id,
         product_id=wishlist_item.product_id
     )
     db.add(new_item)
@@ -360,12 +360,12 @@ async def add_to_wishlist(
 @router.delete("/wishlist/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_from_wishlist(
     product_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Remove item from wishlist"""
     wishlist_item = db.query(Wishlist).filter(
-        Wishlist.customer_id == current_user["id"],
+        Wishlist.customer_id == current_user.id,
         Wishlist.product_id == product_id
     ).first()
     
@@ -389,12 +389,12 @@ def generate_order_number():
 @router.post("/orders", status_code=status.HTTP_201_CREATED)
 async def create_order(
     order_data: OrderCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Create order from cart"""
     # Get cart items
-    cart_items = db.query(Cart).filter(Cart.customer_id == current_user["id"]).all()
+    cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
     
     if not cart_items:
         raise HTTPException(status_code=400, detail="Cart is empty")
@@ -404,7 +404,7 @@ async def create_order(
     
     # Create order
     new_order = Order(
-        customer_id=current_user["id"],
+        customer_id=current_user.id,
         order_number=generate_order_number(),
         total_amount=total_amount,
         shipping_address=order_data.shipping_address,
@@ -428,7 +428,7 @@ async def create_order(
         db.add(order_item)
     
     # Clear cart
-    db.query(Cart).filter(Cart.customer_id == current_user["id"]).delete()
+    db.query(Cart).filter(Cart.customer_id == current_user.id).delete()
     
     db.commit()
     db.refresh(new_order)
@@ -440,12 +440,12 @@ async def create_order(
 
 @router.get("/orders")
 async def get_orders(
-    current_user: dict = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get current user's orders"""
     orders = db.query(Order).filter(
-        Order.customer_id == current_user["id"]
+        Order.customer_id == current_user.id
     ).order_by(Order.created_at.desc()).all()
     
     return {"orders": [order.to_dict() for order in orders]}
@@ -453,13 +453,13 @@ async def get_orders(
 @router.get("/orders/{order_id}")
 async def get_order(
     order_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get specific order details"""
     order = db.query(Order).filter(
         Order.id == order_id,
-        Order.customer_id == current_user["id"]
+        Order.customer_id == current_user.id
     ).first()
     
     if not order:
