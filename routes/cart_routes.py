@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from models.cart_models import (
+from models.cart_model import (
     AddToCartRequest,
     UpdateCartItemRequest,
     CartItemResponse,
