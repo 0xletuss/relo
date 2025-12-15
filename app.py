@@ -4,6 +4,8 @@ from fastapi.responses import JSONResponse
 from routes.auth_routes import router as auth_router
 from routes.product_routes import router as product_router
 from models.database import create_tables
+from routes.cart_routes import router as cart_router
+
 import traceback
 import os
 
@@ -53,6 +55,7 @@ async def startup_event():
 # Include routers
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(product_router, prefix="/api", tags=["Products"])
+app.include_router(cart_router, prefix="/api", tags=["Cart"])
 
 # Root endpoint
 @app.get("/")
