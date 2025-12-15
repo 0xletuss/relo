@@ -1,19 +1,19 @@
 # =====================================================
-# models/product_model.py - FIXED FOR MYSQL
+# models/product_model.py - COMPLETE FIX
 # =====================================================
 
-from sqlalchemy import Column, Integer, String, Float, Text, Boolean, DateTime, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Text, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from models.database import Base
-import enum
 
-class StockStatus(str, enum.Enum):
+# Simple string constants for validation
+class StockStatus:
     IN_STOCK = "in_stock"
     OUT_OF_STOCK = "out_of_stock"
     PRE_ORDER = "pre_order"
 
-class OrderStatus(str, enum.Enum):
+class OrderStatus:
     PENDING = "pending"
     PROCESSING = "processing"
     SHIPPED = "shipped"
@@ -22,6 +22,7 @@ class OrderStatus(str, enum.Enum):
 
 class Product(Base):
     __tablename__ = "products"
+    __table_args__ = {'extend_existing': True}  # Force override existing metadata
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
@@ -32,13 +33,7 @@ class Product(Base):
     material = Column(String(100), nullable=True)
     case_size = Column(String(20), nullable=True)
     image_url = Column(String(500), nullable=True)
-    
-    # FIXED: Use native_enum=False for MySQL compatibility
-    stock_status = Column(
-        Enum(StockStatus, native_enum=False, length=20),
-        default=StockStatus.IN_STOCK
-    )
-    
+    stock_status = Column(String(20), nullable=True, default="in_stock")
     featured = Column(Boolean, default=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -59,7 +54,7 @@ class Product(Base):
             "material": self.material,
             "case_size": self.case_size,
             "image_url": self.image_url,
-            "stock_status": self.stock_status.value if self.stock_status else None,
+            "stock_status": self.stock_status,
             "featured": self.featured,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
@@ -67,6 +62,7 @@ class Product(Base):
 
 class Category(Base):
     __tablename__ = "categories"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False, unique=True)
@@ -87,6 +83,7 @@ class Category(Base):
 
 class Cart(Base):
     __tablename__ = "cart"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -111,6 +108,7 @@ class Cart(Base):
 
 class Wishlist(Base):
     __tablename__ = "wishlist"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -131,19 +129,13 @@ class Wishlist(Base):
 
 class Order(Base):
     __tablename__ = "orders"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     order_number = Column(String(50), nullable=False, unique=True)
     total_amount = Column(Float, nullable=False)
-    
-    # FIXED: Use native_enum=False for MySQL compatibility
-    status = Column(
-        Enum(OrderStatus, native_enum=False, length=20),
-        default=OrderStatus.PENDING,
-        index=True
-    )
-    
+    status = Column(String(20), nullable=True, default="pending", index=True)
     shipping_address = Column(Text, nullable=True)
     billing_address = Column(Text, nullable=True)
     payment_method = Column(String(50), nullable=True)
@@ -160,7 +152,7 @@ class Order(Base):
             "customer_id": self.customer_id,
             "order_number": self.order_number,
             "total_amount": self.total_amount,
-            "status": self.status.value if self.status else None,
+            "status": self.status,
             "shipping_address": self.shipping_address,
             "billing_address": self.billing_address,
             "payment_method": self.payment_method,
@@ -172,6 +164,7 @@ class Order(Base):
 
 class OrderItem(Base):
     __tablename__ = "order_items"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)

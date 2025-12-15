@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, MetaData
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -44,8 +44,9 @@ except Exception as e:
 # Create session
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Base class for models
-Base = declarative_base()
+# FIXED: Clear metadata to prevent enum caching issues
+metadata = MetaData()
+Base = declarative_base(metadata=metadata)
 
 # Database models
 class User(Base):
@@ -81,3 +82,6 @@ def get_db():
 # Create tables
 def create_tables():
     Base.metadata.create_all(bind=engine)
+
+# Export for use in other modules
+SQLALCHEMY_DATABASE_URL = DATABASE_URL
