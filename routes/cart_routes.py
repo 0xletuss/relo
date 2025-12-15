@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
-from models.cart_model import (
+from models.cart_models import (
     AddToCartRequest,
     UpdateCartItemRequest,
     CartItemResponse,
@@ -8,7 +8,8 @@ from models.cart_model import (
     CartActionResponse,
     ProductInCart
 )
-from models.database import get_db, User, Cart, Product, Customer
+from models.database import get_db, User
+from models.product_model import Cart, Product
 from routes.auth_routes import get_current_user
 from typing import List
 
@@ -61,25 +62,6 @@ def calculate_cart_response(cart_items, db: Session) -> CartResponse:
         total_amount=total_amount
     )
 
-# Helper function to get or create customer
-def get_or_create_customer(user: User, db: Session) -> Customer:
-    """Get existing customer or create new one for user"""
-    # Try to find customer by email
-    customer = db.query(Customer).filter(Customer.email == user.email).first()
-    
-    if not customer:
-        # Create new customer
-        customer = Customer(
-            email=user.email,
-            first_name=user.username,
-            last_name=""
-        )
-        db.add(customer)
-        db.commit()
-        db.refresh(customer)
-    
-    return customer
-
 # Routes
 @router.get("/cart", response_model=CartResponse)
 async def get_cart(
@@ -87,11 +69,8 @@ async def get_cart(
     db: Session = Depends(get_db)
 ):
     """Get current user's cart"""
-    # Get or create customer
-    customer = get_or_create_customer(current_user, db)
-    
-    # Get cart items
-    cart_items = db.query(Cart).filter(Cart.customer_id == customer.id).all()
+    # Cart is linked directly to user via customer_id (which is user.id)
+    cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
     
     return calculate_cart_response(cart_items, db)
 
@@ -102,9 +81,6 @@ async def add_to_cart(
     db: Session = Depends(get_db)
 ):
     """Add product to cart"""
-    # Get or create customer
-    customer = get_or_create_customer(current_user, db)
-    
     # Verify product exists
     product = db.query(Product).filter(Product.id == request.product_id).first()
     if not product:
@@ -122,7 +98,7 @@ async def add_to_cart(
     
     # Check if item already exists in cart
     existing_cart_item = db.query(Cart).filter(
-        Cart.customer_id == customer.id,
+        Cart.customer_id == current_user.id,
         Cart.product_id == request.product_id
     ).first()
     
@@ -135,7 +111,7 @@ async def add_to_cart(
     else:
         # Create new cart item
         new_cart_item = Cart(
-            customer_id=customer.id,
+            customer_id=current_user.id,
             product_id=request.product_id,
             quantity=request.quantity
         )
@@ -145,7 +121,7 @@ async def add_to_cart(
         message = "Product added to cart successfully"
     
     # Get updated cart
-    cart_items = db.query(Cart).filter(Cart.customer_id == customer.id).all()
+    cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
     cart_response = calculate_cart_response(cart_items, db)
     
     return CartActionResponse(
@@ -161,13 +137,10 @@ async def update_cart_item(
     db: Session = Depends(get_db)
 ):
     """Update cart item quantity"""
-    # Get or create customer
-    customer = get_or_create_customer(current_user, db)
-    
     # Find cart item
     cart_item = db.query(Cart).filter(
         Cart.id == cart_item_id,
-        Cart.customer_id == customer.id
+        Cart.customer_id == current_user.id
     ).first()
     
     if not cart_item:
@@ -182,7 +155,7 @@ async def update_cart_item(
     db.refresh(cart_item)
     
     # Get updated cart
-    cart_items = db.query(Cart).filter(Cart.customer_id == customer.id).all()
+    cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
     cart_response = calculate_cart_response(cart_items, db)
     
     return CartActionResponse(
@@ -197,13 +170,10 @@ async def remove_from_cart(
     db: Session = Depends(get_db)
 ):
     """Remove item from cart"""
-    # Get or create customer
-    customer = get_or_create_customer(current_user, db)
-    
     # Find cart item
     cart_item = db.query(Cart).filter(
         Cart.id == cart_item_id,
-        Cart.customer_id == customer.id
+        Cart.customer_id == current_user.id
     ).first()
     
     if not cart_item:
@@ -217,7 +187,7 @@ async def remove_from_cart(
     db.commit()
     
     # Get updated cart
-    cart_items = db.query(Cart).filter(Cart.customer_id == customer.id).all()
+    cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
     cart_response = calculate_cart_response(cart_items, db)
     
     return CartActionResponse(
@@ -231,11 +201,8 @@ async def clear_cart(
     db: Session = Depends(get_db)
 ):
     """Clear entire cart"""
-    # Get or create customer
-    customer = get_or_create_customer(current_user, db)
-    
     # Delete all cart items
-    db.query(Cart).filter(Cart.customer_id == customer.id).delete()
+    db.query(Cart).filter(Cart.customer_id == current_user.id).delete()
     db.commit()
     
     return CartActionResponse(
