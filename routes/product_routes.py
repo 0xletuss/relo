@@ -1,5 +1,5 @@
 # =====================================================
-# routes/product_routes.py - REFACTORED & OPTIMIZED
+# routes/product_routes.py - FIXED PYDANTIC SCHEMAS
 # =====================================================
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from models.database import get_db
-from models.product_model import Product, Category, Cart, Wishlist, Order, OrderItem, StockStatus, OrderStatus
+from models.product_model import Product, Category, Cart, Wishlist, Order, OrderItem
 from routes.auth_routes import get_current_user
 import random
 import string
@@ -16,7 +16,7 @@ from datetime import datetime
 router = APIRouter()
 
 # =====================================================
-# Pydantic Schemas
+# Pydantic Schemas - FIXED: Use str instead of Enum
 # =====================================================
 
 class ProductCreate(BaseModel):
@@ -28,7 +28,7 @@ class ProductCreate(BaseModel):
     material: Optional[str] = None
     case_size: Optional[str] = None
     image_url: Optional[str] = None
-    stock_status: Optional[StockStatus] = StockStatus.IN_STOCK
+    stock_status: Optional[str] = "in_stock"  # Changed from StockStatus enum
     featured: bool = False
 
 
@@ -41,7 +41,7 @@ class ProductUpdate(BaseModel):
     material: Optional[str] = None
     case_size: Optional[str] = None
     image_url: Optional[str] = None
-    stock_status: Optional[StockStatus] = None
+    stock_status: Optional[str] = None  # Changed from StockStatus enum
     featured: Optional[bool] = None
 
 
@@ -55,7 +55,7 @@ class ProductResponse(BaseModel):
     material: Optional[str] = None
     case_size: Optional[str] = None
     image_url: Optional[str] = None
-    stock_status: str
+    stock_status: Optional[str] = None  # Changed from enum to str
     featured: bool
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -142,7 +142,7 @@ class OrderResponse(BaseModel):
     customer_id: int
     order_number: str
     total_amount: float
-    status: str
+    status: Optional[str] = None  # Changed from enum to str
     shipping_address: Optional[str] = None
     billing_address: Optional[str] = None
     payment_method: Optional[str] = None
@@ -753,7 +753,7 @@ async def create_order(
         # Calculate total amount
         total_amount = sum(item.product.price * item.quantity for item in cart_items)
         
-        # Create order
+        # Create order - FIXED: Use string instead of enum
         new_order = Order(
             customer_id=current_user.id,
             order_number=generate_order_number(),
@@ -762,7 +762,7 @@ async def create_order(
             billing_address=order_data.billing_address or order_data.shipping_address,
             payment_method=order_data.payment_method,
             notes=order_data.notes,
-            status=OrderStatus.PENDING
+            status="pending"  # Changed from OrderStatus.PENDING
         )
         db.add(new_order)
         db.flush()  # Get order ID without committing
