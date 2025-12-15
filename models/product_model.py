@@ -1,5 +1,5 @@
 # =====================================================
-# models/product_model.py
+# models/product_model.py - FIXED FOR MYSQL
 # =====================================================
 
 from sqlalchemy import Column, Integer, String, Float, Text, Boolean, DateTime, Enum, ForeignKey
@@ -13,6 +13,13 @@ class StockStatus(str, enum.Enum):
     OUT_OF_STOCK = "out_of_stock"
     PRE_ORDER = "pre_order"
 
+class OrderStatus(str, enum.Enum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    SHIPPED = "shipped"
+    DELIVERED = "delivered"
+    CANCELLED = "cancelled"
+
 class Product(Base):
     __tablename__ = "products"
 
@@ -25,7 +32,13 @@ class Product(Base):
     material = Column(String(100), nullable=True)
     case_size = Column(String(20), nullable=True)
     image_url = Column(String(500), nullable=True)
-    stock_status = Column(Enum(StockStatus), default=StockStatus.IN_STOCK)
+    
+    # FIXED: Use native_enum=False for MySQL compatibility
+    stock_status = Column(
+        Enum(StockStatus, native_enum=False, length=20),
+        default=StockStatus.IN_STOCK
+    )
+    
     featured = Column(Boolean, default=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -116,13 +129,6 @@ class Wishlist(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
 
-class OrderStatus(str, enum.Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    SHIPPED = "shipped"
-    DELIVERED = "delivered"
-    CANCELLED = "cancelled"
-
 class Order(Base):
     __tablename__ = "orders"
 
@@ -130,7 +136,14 @@ class Order(Base):
     customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     order_number = Column(String(50), nullable=False, unique=True)
     total_amount = Column(Float, nullable=False)
-    status = Column(Enum(OrderStatus), default=OrderStatus.PENDING, index=True)
+    
+    # FIXED: Use native_enum=False for MySQL compatibility
+    status = Column(
+        Enum(OrderStatus, native_enum=False, length=20),
+        default=OrderStatus.PENDING,
+        index=True
+    )
+    
     shipping_address = Column(Text, nullable=True)
     billing_address = Column(Text, nullable=True)
     payment_method = Column(String(50), nullable=True)
