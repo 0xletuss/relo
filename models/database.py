@@ -79,9 +79,25 @@ def get_db():
     finally:
         db.close()
 
-# Create tables
+# Create tables - UPDATED to import order models
 def create_tables():
+    """Create all database tables including order tables"""
+    # Import all models to ensure they're registered with Base
+    try:
+        from models.order_db_models import Order, OrderItem
+        print("✓ Order models imported successfully")
+    except ImportError as e:
+        print(f"⚠ Warning: Could not import order models: {e}")
+    
+    try:
+        from models.product_model import Product, Cart
+        print("✓ Product models imported successfully")
+    except ImportError as e:
+        print(f"⚠ Warning: Could not import product models: {e}")
+    
+    # Create all tables
     Base.metadata.create_all(bind=engine)
+    print("✓ Database tables created/verified")
 
 # Export for use in other modules
 SQLALCHEMY_DATABASE_URL = DATABASE_URL
