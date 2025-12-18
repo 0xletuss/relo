@@ -18,6 +18,7 @@ class Product(Base):
     __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
+    seller_id = Column(Integer, nullable=True, index=True)  # ADD THIS LINE
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     price = Column(Float, nullable=False)
@@ -39,6 +40,7 @@ class Product(Base):
     def to_dict(self):
         return {
             "id": self.id,
+            "seller_id": self.seller_id,
             "name": self.name,
             "description": self.description,
             "price": self.price,
