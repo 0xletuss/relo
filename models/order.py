@@ -43,8 +43,14 @@ class Order(Base):
     __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    # FIXED: Changed to customer_id linking to customers table
-    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    customer_id = Column(Integer, ForeignKey("customers.id", ondelete="CASCADE"), nullable=True)
+    seller_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    
+    # Customer info (denormalized for quick access)
+    customer_name = Column(String(100), nullable=True)
+    customer_phone = Column(String(20), nullable=True)
+    
+    # Order details
     order_number = Column(String(50), unique=True, nullable=False, index=True)
     total_amount = Column(DECIMAL(10, 2), nullable=False, default=0.00)
     status = Column(SQLEnum(OrderStatus), nullable=False, default=OrderStatus.PENDING, index=True)
@@ -59,10 +65,10 @@ class Order(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    # Relationships - FIXED: Link to Customer instead of User
+    # Relationships
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     customer = relationship("Customer", back_populates="orders")
-
+    
 class OrderItem(Base):
     __tablename__ = "order_items"
     __table_args__ = {'extend_existing': True}
