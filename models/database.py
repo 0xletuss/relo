@@ -102,6 +102,24 @@ class Customer(Base):
     # FIXED: Added orders relationship
     orders = relationship("Order", back_populates="customer", cascade="all, delete-orphan")
 
+# Add this OTP model class to your models/database.py file
+# Place it after the RefreshToken class, before the get_db function
+
+class OTP(Base):
+    __tablename__ = "otps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    otp_hash = Column(String(255), nullable=False)  # Store hashed OTP for security
+    purpose = Column(String(50), default='verification')  # verification, password_reset, login
+    attempts = Column(Integer, default=0)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_used = Column(Boolean, default=False)
+
+    def __repr__(self):
+        return f"<OTP(email={self.email}, purpose={self.purpose}, expires_at={self.expires_at})>"
+    
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
