@@ -7,6 +7,8 @@ from models.database import create_tables
 from routes.cart_routes import router as cart_router
 from routes.order_routes import router as order_router
 from routes.seller_routes import router as seller_router
+from routes.otp_routes import router as otp_router
+from utils.email_service import init_email_service
 
 import traceback
 import os
@@ -21,6 +23,13 @@ cloudinary.config(
     api_secret=os.getenv("CLOUDINARY_API_SECRET"),
     secure=True
 )
+
+# Initialize Brevo Email Service
+BREVO_API_KEY = os.getenv("BREVO_API_KEY")
+if BREVO_API_KEY:
+    init_email_service(BREVO_API_KEY)
+else:
+    print("⚠️  Warning: BREVO_API_KEY not found in environment variables")
 
 # Create FastAPI app
 app = FastAPI(
@@ -115,6 +124,12 @@ async def startup_event():
         else:
             print("⚠️  Warning: Cloudinary credentials not found in environment variables")
         
+        # Verify Brevo Email Service
+        if BREVO_API_KEY:
+            print("📧 Brevo Email Service initialized")
+        else:
+            print("⚠️  Warning: Brevo Email Service not configured")
+        
         print("✅ Server is ready!")
         print("=" * 50)
     except Exception as e:
@@ -127,6 +142,7 @@ app.include_router(product_router, prefix="/api", tags=["Products"])
 app.include_router(cart_router, prefix="/api", tags=["Cart"])
 app.include_router(order_router, prefix="/api", tags=["Orders"])
 app.include_router(seller_router, prefix="/api", tags=["Seller"])
+app.include_router(otp_router, prefix="/api/otp", tags=["OTP"])
 
 # Root endpoint
 @app.get("/")
@@ -136,11 +152,13 @@ async def root():
         "status": "running",
         "version": "1.0.0",
         "cloudinary": "enabled" if cloudinary.config().cloud_name else "not configured",
+        "email_service": "enabled" if BREVO_API_KEY else "not configured",
         "endpoints": {
             "docs": "/docs",
             "health": "/health",
             "auth": "/api/auth",
-            "products": "/api/products"
+            "products": "/api/products",
+            "otp": "/api/otp"
         }
     }
 
@@ -151,7 +169,8 @@ async def health_check():
         "status": "healthy",
         "database": "connected",
         "cors": "enabled",
-        "cloudinary": "configured" if cloudinary.config().cloud_name else "not configured"
+        "cloudinary": "configured" if cloudinary.config().cloud_name else "not configured",
+        "email_service": "configured" if BREVO_API_KEY else "not configured"
     }
 
 # Explicit OPTIONS handler for auth routes (belt and suspenders approach)
@@ -172,8 +191,9 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(
-        "app:app",  # Changed from "main:app" to "app:app"
+        "app:app",
         host="0.0.0.0",
         port=port,
         reload=True
     )
+    
