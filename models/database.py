@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, MetaData
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 import os
 
@@ -60,6 +60,9 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True, index=True)
     last_login = Column(DateTime, nullable=True)
+    
+    # FIXED: Add orders relationship
+    orders = relationship("Order", back_populates="customer")
 
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
@@ -79,23 +82,31 @@ def get_db():
     finally:
         db.close()
 
-# Create tables - UPDATED to import order models
+# Create tables - FIXED import path
 def create_tables():
     """Create all database tables including order tables"""
+    print("📦 Importing models...")
+    
     # Import all models to ensure they're registered with Base
     try:
-        from models.order_db_models import Order, OrderItem
+        # FIXED: Import from order.py (not order_db_models)
+        from models.order import Order, OrderItem
         print("✓ Order models imported successfully")
     except ImportError as e:
         print(f"⚠ Warning: Could not import order models: {e}")
+        import traceback
+        traceback.print_exc()
     
     try:
         from models.product_model import Product, Cart
         print("✓ Product models imported successfully")
     except ImportError as e:
         print(f"⚠ Warning: Could not import product models: {e}")
+        import traceback
+        traceback.print_exc()
     
     # Create all tables
+    print("🔨 Creating database tables...")
     Base.metadata.create_all(bind=engine)
     print("✓ Database tables created/verified")
 

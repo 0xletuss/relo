@@ -1,7 +1,10 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-from models.order_model import (
+# FIXED: Import everything from order.py (not order_model or order_db_models)
+from models.order import (
+    Order,
+    OrderItem,
     CreateOrderRequest,
     UpdateOrderStatusRequest,
     UpdatePaymentStatusRequest,
@@ -16,7 +19,6 @@ from models.order_model import (
 )
 from models.database import get_db, User
 from models.product_model import Cart, Product
-from models.order_db_models import Order, OrderItem
 from routes.auth_routes import get_current_user
 from typing import Optional
 import logging
@@ -74,8 +76,6 @@ def build_order_response(order: Order, db: Session) -> OrderResponse:
             id=item.id,
             order_id=item.order_id,
             product_id=item.product_id,
-            product_name=product.name if product else "Unknown Product",
-            product_reference=product.reference_number if product else None,
             quantity=item.quantity,
             price=float(item.price),
             subtotal=float(item.subtotal),
