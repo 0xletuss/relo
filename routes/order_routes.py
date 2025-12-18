@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
-# FIXED: Import everything from order.py (not order_model or order_db_models)
 from models.order import (
     Order,
     OrderItem,
@@ -111,9 +110,17 @@ async def create_order(
 ):
     """Create order from cart items"""
     try:
-        logger.info(f"User {current_user.id} creating order")
+        # FIXED: Verify user has customer profile
+        if not current_user.customer:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User does not have a customer profile. Only customers can create orders."
+            )
         
-        # Get cart items
+        customer_id = current_user.customer.id
+        logger.info(f"User {current_user.id} (Customer {customer_id}) creating order")
+        
+        # FIXED: Get cart items using user_id (Cart links to User, not Customer)
         cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
         
         if not cart_items:
@@ -144,9 +151,9 @@ async def create_order(
         # Generate order number
         order_number = generate_order_number()
         
-        # Create order
+        # FIXED: Use customer_id from customer relationship
         new_order = Order(
-            customer_id=current_user.id,
+            customer_id=customer_id,  # Use Customer.id, not User.id
             order_number=order_number,
             total_amount=totals["total_amount"],
             status=OrderStatus.PENDING,
@@ -216,10 +223,18 @@ async def get_orders(
 ):
     """Get user's orders with pagination"""
     try:
-        logger.info(f"Fetching orders for user {current_user.id}")
+        # FIXED: Verify user has customer profile
+        if not current_user.customer:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User does not have a customer profile."
+            )
         
-        # Build query
-        query = db.query(Order).filter(Order.customer_id == current_user.id)
+        customer_id = current_user.customer.id
+        logger.info(f"Fetching orders for customer {customer_id}")
+        
+        # FIXED: Build query using customer_id
+        query = db.query(Order).filter(Order.customer_id == customer_id)
         
         # Apply status filter if provided
         if status_filter:
@@ -256,6 +271,8 @@ async def get_orders(
             page_size=page_size
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching orders: {str(e)}", exc_info=True)
         raise HTTPException(
@@ -271,11 +288,20 @@ async def get_order(
 ):
     """Get specific order details"""
     try:
-        logger.info(f"Fetching order {order_id} for user {current_user.id}")
+        # FIXED: Verify user has customer profile
+        if not current_user.customer:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User does not have a customer profile."
+            )
         
+        customer_id = current_user.customer.id
+        logger.info(f"Fetching order {order_id} for customer {customer_id}")
+        
+        # FIXED: Filter by customer_id
         order = db.query(Order).filter(
             Order.id == order_id,
-            Order.customer_id == current_user.id
+            Order.customer_id == customer_id
         ).first()
         
         if not order:
@@ -303,11 +329,20 @@ async def cancel_order(
 ):
     """Cancel an order"""
     try:
-        logger.info(f"Cancelling order {order_id} for user {current_user.id}")
+        # FIXED: Verify user has customer profile
+        if not current_user.customer:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User does not have a customer profile."
+            )
         
+        customer_id = current_user.customer.id
+        logger.info(f"Cancelling order {order_id} for customer {customer_id}")
+        
+        # FIXED: Filter by customer_id
         order = db.query(Order).filter(
             Order.id == order_id,
-            Order.customer_id == current_user.id
+            Order.customer_id == customer_id
         ).first()
         
         if not order:
@@ -351,10 +386,18 @@ async def get_order_stats(
 ):
     """Get order statistics for current user"""
     try:
-        logger.info(f"Fetching order stats for user {current_user.id}")
+        # FIXED: Verify user has customer profile
+        if not current_user.customer:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User does not have a customer profile."
+            )
         
-        # Get all orders for user
-        orders = db.query(Order).filter(Order.customer_id == current_user.id).all()
+        customer_id = current_user.customer.id
+        logger.info(f"Fetching order stats for customer {customer_id}")
+        
+        # FIXED: Get all orders for customer
+        orders = db.query(Order).filter(Order.customer_id == customer_id).all()
         
         # Calculate stats
         total_orders = len(orders)
@@ -379,6 +422,8 @@ async def get_order_stats(
             average_order_value=avg_order_value
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching order stats: {str(e)}", exc_info=True)
         raise HTTPException(

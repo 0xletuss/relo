@@ -63,7 +63,6 @@ class User(Base):
     last_login = Column(DateTime, nullable=True)
     
     # Relationships - using back_populates for bidirectional relationships
-    # FIXED: Removed 'orders' relationship - orders link to Seller/Customer, not User directly
     seller = relationship("Seller", back_populates="user", uselist=False, lazy="select")
     customer = relationship("Customer", back_populates="user", uselist=False, lazy="select")
 
@@ -82,8 +81,6 @@ class Seller(Base):
     
     # Relationships
     user = relationship("User", back_populates="seller")
-    # Note: Add orders relationship when Order model is imported:
-    # orders = relationship("Order", back_populates="seller")
 
 class Customer(Base):
     __tablename__ = "customers"
@@ -102,10 +99,8 @@ class Customer(Base):
     
     # Relationships
     user = relationship("User", back_populates="customer")
-    # Note: Add relationships when models are imported:
-    # orders = relationship("Order", back_populates="customer")
-    # cart_items = relationship("Cart", back_populates="customer")
-    # wishlist_items = relationship("Wishlist", back_populates="customer")
+    # FIXED: Added orders relationship
+    orders = relationship("Order", back_populates="customer", cascade="all, delete-orphan")
 
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
@@ -132,7 +127,6 @@ def create_tables():
     
     # Import all models to ensure they're registered with Base
     try:
-        # FIXED: Import from order.py (not order_db_models)
         from models.order import Order, OrderItem
         print("✓ Order models imported successfully")
     except ImportError as e:
