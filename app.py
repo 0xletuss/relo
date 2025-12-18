@@ -14,11 +14,11 @@ import cloudinary
 import cloudinary.uploader
 import cloudinary.api
 
-# Configure Cloudinary
+# Configure Cloudinary using environment variables
 cloudinary.config(
-    cloud_name="dwgvlwkyt",
-    api_key="537837441683251",
-    api_secret="t4suq36vRuC4whmqlMZG8w_uHuw",
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
     secure=True
 )
 
@@ -106,8 +106,15 @@ async def startup_event():
         print("🚀 Starting Rolex Store API...")
         create_tables()
         print("✅ Database tables created/verified")
-        print("☁️  Cloudinary configured successfully")
-        print(f"   Cloud Name: {cloudinary.config().cloud_name}")
+        
+        # Verify Cloudinary configuration
+        cloud_name = cloudinary.config().cloud_name
+        if cloud_name:
+            print("☁️  Cloudinary configured successfully")
+            print(f"   Cloud Name: {cloud_name}")
+        else:
+            print("⚠️  Warning: Cloudinary credentials not found in environment variables")
+        
         print("✅ Server is ready!")
         print("=" * 50)
     except Exception as e:
@@ -128,7 +135,7 @@ async def root():
         "message": "Welcome to Rolex Store API",
         "status": "running",
         "version": "1.0.0",
-        "cloudinary": "enabled",
+        "cloudinary": "enabled" if cloudinary.config().cloud_name else "not configured",
         "endpoints": {
             "docs": "/docs",
             "health": "/health",
@@ -144,7 +151,7 @@ async def health_check():
         "status": "healthy",
         "database": "connected",
         "cors": "enabled",
-        "cloudinary": "configured"
+        "cloudinary": "configured" if cloudinary.config().cloud_name else "not configured"
     }
 
 # Explicit OPTIONS handler for auth routes (belt and suspenders approach)
@@ -165,7 +172,7 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(
-        "main:app",
+        "app:app",  # Changed from "main:app" to "app:app"
         host="0.0.0.0",
         port=port,
         reload=True
