@@ -49,6 +49,9 @@ metadata = MetaData()
 Base = declarative_base(metadata=metadata)
 
 # Database models
+# Update your User model in models/database.py
+# Add this column to the User class:
+
 class User(Base):
     __tablename__ = "users"
 
@@ -56,14 +59,16 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
+    role = Column(String(20), default='customer', nullable=False, index=True)  # ADD THIS LINE
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True, index=True)
     last_login = Column(DateTime, nullable=True)
     
-    # FIXED: Add orders relationship
+    # Relationships
     orders = relationship("Order", back_populates="customer")
 
+    
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
