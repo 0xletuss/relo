@@ -17,40 +17,87 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware - MUST be before routes
+# CRITICAL: Add CORS middleware BEFORE any routes
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
+    expose_headers=["*"],
 )
+
+# Add manual CORS headers to every response
+@app.middleware("http")
+async def add_cors_headers(request: Request, call_next):
+    # Log the request
+    print(f"📨 {request.method} {request.url.path}")
+    
+    # Handle OPTIONS (preflight) requests
+    if request.method == "OPTIONS":
+        return JSONResponse(
+            content={"message": "OK"},
+            status_code=200,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept, Origin",
+                "Access-Control-Max-Age": "3600",
+            }
+        )
+    
+    # Process the request
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        print(f"❌ Error in request: {e}")
+        traceback.print_exc()
+        return JSONResponse(
+            content={"detail": str(e)},
+            status_code=500,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
+    
+    # Add CORS headers to the response
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, Accept, Origin"
+    
+    print(f"📤 Response: {response.status_code}")
+    return response
 
 # Global exception handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    print(f"Global exception handler caught: {exc}")
+    print(f"❌ Global exception: {exc}")
     print(traceback.format_exc())
     return JSONResponse(
         status_code=500,
         content={
             "detail": str(exc),
-            "type": type(exc).__name__,
-            "path": str(request.url)
+            "type": type(exc).__name__
+        },
+        headers={
+            "Access-Control-Allow-Origin": "*",
         }
     )
 
-# Create database tables on startup
+# Startup event
 @app.on_event("startup")
 async def startup_event():
     try:
+        print("=" * 50)
+        print("🚀 Starting Rolex Store API...")
         create_tables()
-        print("✓ Database tables created/verified")
-        print("✓ Server starting...")
-        print(f"✓ Database URL: {os.getenv('DATABASE_URL', 'Using default SQLite')}")
+        print("✅ Database tables created/verified")
+        print("✅ Server is ready!")
+        print("=" * 50)
     except Exception as e:
-        print(f"✗ Error creating tables: {e}")
+        print(f"❌ Startup error: {e}")
         print(traceback.format_exc())
 
 # Include routers
@@ -65,36 +112,44 @@ async def root():
     return {
         "message": "Welcome to Rolex Store API",
         "status": "running",
-        "docs": "/docs",
-        "redoc": "/redoc",
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "endpoints": {
+            "docs": "/docs",
+            "health": "/health",
+            "auth": "/api/auth",
+            "products": "/api/products"
+        }
     }
 
-# Health check endpoint
+# Health check
 @app.get("/health")
 async def health_check():
     return {
         "status": "healthy",
-        "database": "connected"
+        "database": "connected",
+        "cors": "enabled"
     }
 
-# Debug endpoint to check routes
-@app.get("/api/debug/routes")
-async def debug_routes():
-    routes = []
-    for route in app.routes:
-        routes.append({
-            "path": route.path,
-            "name": route.name,
-            "methods": list(route.methods) if hasattr(route, 'methods') else []
-        })
-    return {"routes": routes}
+# Explicit OPTIONS handler for auth routes (belt and suspenders approach)
+@app.options("/api/auth/login")
+@app.options("/api/auth/register")
+@app.options("/api/auth/me")
+async def auth_options():
+    return JSONResponse(
+        content={"message": "OK"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        }
+    )
 
 if __name__ == "__main__":
     import uvicorn
+    port = int(os.getenv("PORT", 8000))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=port,
         reload=True
     )
