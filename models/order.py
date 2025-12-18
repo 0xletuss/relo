@@ -40,6 +40,7 @@ class PaymentMethod(str, Enum):
 
 class Order(Base):
     __tablename__ = "orders"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     customer_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
@@ -63,6 +64,7 @@ class Order(Base):
 
 class OrderItem(Base):
     __tablename__ = "order_items"
+    __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
