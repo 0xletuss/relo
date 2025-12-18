@@ -13,16 +13,9 @@ class StockStatus:
     OUT_OF_STOCK = "out_of_stock"
     PRE_ORDER = "pre_order"
 
-class OrderStatus:
-    PENDING = "pending"
-    PROCESSING = "processing"
-    SHIPPED = "shipped"
-    DELIVERED = "delivered"
-    CANCELLED = "cancelled"
-
 class Product(Base):
     __tablename__ = "products"
-    __table_args__ = {'extend_existing': True}  # Force override existing metadata
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
@@ -41,7 +34,7 @@ class Product(Base):
     # Relationships
     cart_items = relationship("Cart", back_populates="product", cascade="all, delete-orphan")
     wishlist_items = relationship("Wishlist", back_populates="product", cascade="all, delete-orphan")
-    order_items = relationship("OrderItem", back_populates="product")
+    # OrderItem relationship is defined in models/order.py
 
     def to_dict(self):
         return {
@@ -127,63 +120,5 @@ class Wishlist(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
 
-class Order(Base):
-    __tablename__ = "orders"
-    __table_args__ = {'extend_existing': True}
-
-    id = Column(Integer, primary_key=True, index=True)
-    customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    order_number = Column(String(50), nullable=False, unique=True)
-    total_amount = Column(Float, nullable=False)
-    status = Column(String(20), nullable=True, default="pending", index=True)
-    shipping_address = Column(Text, nullable=True)
-    billing_address = Column(Text, nullable=True)
-    payment_method = Column(String(50), nullable=True)
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    # Relationships
-    order_items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "customer_id": self.customer_id,
-            "order_number": self.order_number,
-            "total_amount": self.total_amount,
-            "status": self.status,
-            "shipping_address": self.shipping_address,
-            "billing_address": self.billing_address,
-            "payment_method": self.payment_method,
-            "notes": self.notes,
-            "order_items": [item.to_dict() for item in self.order_items] if self.order_items else [],
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None
-        }
-
-class OrderItem(Base):
-    __tablename__ = "order_items"
-    __table_args__ = {'extend_existing': True}
-
-    id = Column(Integer, primary_key=True, index=True)
-    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
-    product_id = Column(Integer, ForeignKey("products.id"), nullable=False)
-    quantity = Column(Integer, nullable=False, default=1)
-    price = Column(Float, nullable=False)
-    subtotal = Column(Float, nullable=False)
-
-    # Relationships
-    order = relationship("Order", back_populates="order_items")
-    product = relationship("Product", back_populates="order_items")
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "order_id": self.order_id,
-            "product_id": self.product_id,
-            "quantity": self.quantity,
-            "price": self.price,
-            "subtotal": self.subtotal,
-            "product": self.product.to_dict() if self.product else None
-        }
+# NOTE: Order and OrderItem are now defined in models/order.py
+# Do NOT define them here to avoid duplicate class errors
