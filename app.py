@@ -5,6 +5,7 @@ from routes.auth_routes import router as auth_router
 from routes.product_routes import router as product_router
 from models.database import create_tables
 from routes.cart_routes import router as cart_router
+from routes.order_routes import router as order_router
 
 import traceback
 import os
@@ -56,6 +57,7 @@ async def startup_event():
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(product_router, prefix="/api", tags=["Products"])
 app.include_router(cart_router, prefix="/api", tags=["Cart"])
+app.include_router(order_router, prefix="/api", tags=["Orders"])
 
 # Root endpoint
 @app.get("/")
