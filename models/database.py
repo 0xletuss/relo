@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, MetaData
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime, MetaData, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -49,9 +49,6 @@ metadata = MetaData()
 Base = declarative_base(metadata=metadata)
 
 # Database models
-# Update your User model in models/database.py
-# Add this column to the User class:
-
 class User(Base):
     __tablename__ = "users"
 
@@ -59,16 +56,50 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
-    role = Column(String(20), default='customer', nullable=False, index=True)  # ADD THIS LINE
+    role = Column(String(20), default='customer', nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     is_active = Column(Boolean, default=True, index=True)
     last_login = Column(DateTime, nullable=True)
     
-    # Relationships
-    orders = relationship("Order", back_populates="customer")
+    # Relationships - using back_populates for bidirectional relationships
+    seller = relationship("Seller", back_populates="user", uselist=False, lazy="joined")
+    customer = relationship("Customer", back_populates="user", uselist=False, lazy="joined")
 
+class Seller(Base):
+    __tablename__ = "sellers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), unique=True, nullable=False, index=True)
+    business_name = Column(String(255), nullable=True)
+    business_description = Column(Text, nullable=True)
+    phone = Column(String(20), nullable=True)
+    address = Column(Text, nullable=True)
+    verified = Column(Boolean, default=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Relationships
+    user = relationship("User", back_populates="seller")
+
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), unique=True, nullable=False, index=True)
+    first_name = Column(String(100), nullable=True)
+    last_name = Column(String(100), nullable=True)
+    phone = Column(String(20), nullable=True)
+    address = Column(Text, nullable=True)
+    city = Column(String(100), nullable=True)
+    postal_code = Column(String(20), nullable=True)
+    country = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="customer")
+
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
