@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel, Field
 from models.database import get_db
-from models.product_model import Product, Category, Wishlist, Order, OrderItem
+from models.product_model import Product, Category, Wishlist
+from models.order import Order, OrderItem
 from routes.auth_routes import get_current_user
 import random
 import string
