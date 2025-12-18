@@ -28,6 +28,7 @@ class Product(Base):
     case_size = Column(String(20), nullable=True)
     image_url = Column(String(500), nullable=True)
     stock_status = Column(String(20), nullable=True, default="in_stock")
+    stock = Column(Integer, nullable=False, default=0)  # ADD THIS LINE
     featured = Column(Boolean, default=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
