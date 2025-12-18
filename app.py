@@ -10,6 +10,17 @@ from routes.seller_routes import router as seller_router
 
 import traceback
 import os
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
+# Configure Cloudinary
+cloudinary.config(
+    cloud_name="dwgvlwkyt",
+    api_key="537837441683251",
+    api_secret="t4suq36vRuC4whmqlMZG8w_uHuw",
+    secure=True
+)
 
 # Create FastAPI app
 app = FastAPI(
@@ -95,6 +106,8 @@ async def startup_event():
         print("🚀 Starting Rolex Store API...")
         create_tables()
         print("✅ Database tables created/verified")
+        print("☁️  Cloudinary configured successfully")
+        print(f"   Cloud Name: {cloudinary.config().cloud_name}")
         print("✅ Server is ready!")
         print("=" * 50)
     except Exception as e:
@@ -115,6 +128,7 @@ async def root():
         "message": "Welcome to Rolex Store API",
         "status": "running",
         "version": "1.0.0",
+        "cloudinary": "enabled",
         "endpoints": {
             "docs": "/docs",
             "health": "/health",
@@ -129,7 +143,8 @@ async def health_check():
     return {
         "status": "healthy",
         "database": "connected",
-        "cors": "enabled"
+        "cors": "enabled",
+        "cloudinary": "configured"
     }
 
 # Explicit OPTIONS handler for auth routes (belt and suspenders approach)

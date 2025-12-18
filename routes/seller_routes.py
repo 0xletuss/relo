@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from models.database import get_db
@@ -9,6 +9,9 @@ from models.product_model import Product
 from models.order import Order, OrderItem
 from decimal import Decimal
 import traceback
+import cloudinary
+import cloudinary.uploader
+import base64
 
 router = APIRouter()
 
@@ -34,6 +37,50 @@ class ProductUpdate(BaseModel):
 
 class OrderStatusUpdate(BaseModel):
     status: str
+
+# ==================== IMAGE UPLOAD ====================
+@router.post("/seller/upload-image")
+async def upload_image(file: UploadFile = File(...)):
+    """Upload image to Cloudinary"""
+    try:
+        # Validate file type
+        if not file.content_type.startswith('image/'):
+            raise HTTPException(status_code=400, detail="File must be an image")
+        
+        # Read file content
+        contents = await file.read()
+        
+        # Upload to Cloudinary
+        upload_result = cloudinary.uploader.upload(
+            contents,
+            folder="rolex_products",
+            resource_type="image",
+            transformation=[
+                {'width': 1000, 'height': 1000, 'crop': 'limit'},
+                {'quality': 'auto:good'}
+            ]
+        )
+        
+        return {
+            "message": "Image uploaded successfully",
+            "url": upload_result['secure_url'],
+            "public_id": upload_result['public_id']
+        }
+    except Exception as e:
+        print(f"❌ Error in upload_image: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
+
+@router.delete("/seller/delete-image")
+async def delete_image(public_id: str):
+    """Delete image from Cloudinary"""
+    try:
+        result = cloudinary.uploader.destroy(public_id)
+        return {"message": "Image deleted successfully", "result": result}
+    except Exception as e:
+        print(f"❌ Error in delete_image: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to delete image: {str(e)}")
 
 # ==================== DASHBOARD ====================
 @router.get("/seller/stats")
@@ -149,6 +196,9 @@ async def get_seller_products(
                 "stock": product.stock,
                 "stock_status": product.stock_status,
                 "image_url": product.image_url,
+                "material": product.material,
+                "case_size": product.case_size,
+                "reference_number": product.reference_number,
                 "created_at": product.created_at.isoformat() if product.created_at else None
             })
         
@@ -160,24 +210,58 @@ async def get_seller_products(
 
 @router.post("/seller/products")
 async def create_product(
-    product: ProductCreate, 
-    seller_id: int, 
+    name: str = Form(...),
+    description: Optional[str] = Form(None),
+    price: float = Form(...),
+    category: Optional[str] = Form(None),
+    stock: int = Form(0),
+    material: Optional[str] = Form(None),
+    case_size: Optional[str] = Form(None),
+    reference_number: Optional[str] = Form(None),
+    seller_id: int = Form(...),
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db)
 ):
-    """Create a new product"""
+    """Create a new product with image upload"""
     try:
+        image_url = None
+        
+        # Upload image to Cloudinary if provided
+        if image and image.filename:
+            # Validate file type
+            if not image.content_type.startswith('image/'):
+                raise HTTPException(status_code=400, detail="File must be an image")
+            
+            # Read file content
+            contents = await image.read()
+            
+            # Upload to Cloudinary
+            upload_result = cloudinary.uploader.upload(
+                contents,
+                folder="rolex_products",
+                resource_type="image",
+                transformation=[
+                    {'width': 1000, 'height': 1000, 'crop': 'limit'},
+                    {'quality': 'auto:good'}
+                ]
+            )
+            
+            image_url = upload_result['secure_url']
+            print(f"✅ Image uploaded to Cloudinary: {image_url}")
+        
+        # Create product in database
         new_product = Product(
             seller_id=seller_id,
-            name=product.name,
-            description=product.description,
-            price=product.price,
-            category=product.category,
-            stock=product.stock,
-            material=product.material,
-            case_size=product.case_size,
-            reference_number=product.reference_number,
-            image_url=product.image_url,
-            stock_status='in_stock' if product.stock > 0 else 'out_of_stock'
+            name=name,
+            description=description,
+            price=price,
+            category=category,
+            stock=stock,
+            material=material,
+            case_size=case_size,
+            reference_number=reference_number,
+            image_url=image_url,
+            stock_status='in_stock' if stock > 0 else 'out_of_stock'
         )
         
         db.add(new_product)
@@ -186,8 +270,11 @@ async def create_product(
         
         return {
             "message": "Product created successfully", 
-            "product_id": new_product.id
+            "product_id": new_product.id,
+            "image_url": image_url
         }
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         print(f"❌ Error in create_product: {e}")
@@ -196,12 +283,20 @@ async def create_product(
 
 @router.put("/seller/products/{product_id}")
 async def update_product(
-    product_id: int, 
-    product: ProductUpdate, 
-    seller_id: int, 
+    product_id: int,
+    seller_id: int = Form(...),
+    name: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    price: Optional[float] = Form(None),
+    category: Optional[str] = Form(None),
+    stock: Optional[int] = Form(None),
+    material: Optional[str] = Form(None),
+    case_size: Optional[str] = Form(None),
+    reference_number: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db)
 ):
-    """Update a product"""
+    """Update a product with optional new image"""
     try:
         db_product = db.query(Product).filter(
             Product.id == product_id,
@@ -211,17 +306,62 @@ async def update_product(
         if not db_product:
             raise HTTPException(status_code=404, detail="Product not found")
         
-        update_data = product.dict(exclude_unset=True)
+        # Upload new image if provided
+        if image and image.filename:
+            # Validate file type
+            if not image.content_type.startswith('image/'):
+                raise HTTPException(status_code=400, detail="File must be an image")
+            
+            # Delete old image from Cloudinary if exists
+            if db_product.image_url:
+                try:
+                    # Extract public_id from URL
+                    public_id = db_product.image_url.split('/')[-1].split('.')[0]
+                    cloudinary.uploader.destroy(f"rolex_products/{public_id}")
+                except:
+                    pass  # Continue even if deletion fails
+            
+            # Upload new image
+            contents = await image.read()
+            upload_result = cloudinary.uploader.upload(
+                contents,
+                folder="rolex_products",
+                resource_type="image",
+                transformation=[
+                    {'width': 1000, 'height': 1000, 'crop': 'limit'},
+                    {'quality': 'auto:good'}
+                ]
+            )
+            
+            db_product.image_url = upload_result['secure_url']
+            print(f"✅ New image uploaded: {upload_result['secure_url']}")
         
-        # Update stock_status if stock is being updated
-        if 'stock' in update_data:
-            update_data['stock_status'] = 'in_stock' if update_data['stock'] > 0 else 'out_of_stock'
+        # Update other fields
+        if name is not None:
+            db_product.name = name
+        if description is not None:
+            db_product.description = description
+        if price is not None:
+            db_product.price = price
+        if category is not None:
+            db_product.category = category
+        if stock is not None:
+            db_product.stock = stock
+            db_product.stock_status = 'in_stock' if stock > 0 else 'out_of_stock'
+        if material is not None:
+            db_product.material = material
+        if case_size is not None:
+            db_product.case_size = case_size
+        if reference_number is not None:
+            db_product.reference_number = reference_number
         
-        for key, value in update_data.items():
-            setattr(db_product, key, value)
-        
+        db_product.updated_at = datetime.utcnow()
         db.commit()
-        return {"message": "Product updated successfully"}
+        
+        return {
+            "message": "Product updated successfully",
+            "image_url": db_product.image_url
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -236,7 +376,7 @@ async def delete_product(
     seller_id: int, 
     db: Session = Depends(get_db)
 ):
-    """Delete a product"""
+    """Delete a product and its image from Cloudinary"""
     try:
         db_product = db.query(Product).filter(
             Product.id == product_id,
@@ -245,6 +385,21 @@ async def delete_product(
         
         if not db_product:
             raise HTTPException(status_code=404, detail="Product not found")
+        
+        # Delete image from Cloudinary if exists
+        if db_product.image_url:
+            try:
+                # Extract public_id from URL
+                # Example URL: https://res.cloudinary.com/dwgvlwkyt/image/upload/v1234567890/rolex_products/abc123.jpg
+                url_parts = db_product.image_url.split('/')
+                filename = url_parts[-1].split('.')[0]  # Get filename without extension
+                public_id = f"rolex_products/{filename}"
+                
+                result = cloudinary.uploader.destroy(public_id)
+                print(f"✅ Image deleted from Cloudinary: {public_id}, Result: {result}")
+            except Exception as img_error:
+                print(f"⚠️ Could not delete image from Cloudinary: {img_error}")
+                # Continue with product deletion even if image deletion fails
         
         db.delete(db_product)
         db.commit()
@@ -423,4 +578,4 @@ async def get_top_products(
     except Exception as e:
         print(f"❌ Error in get_top_products: {e}")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get top products: {str(e)}")
