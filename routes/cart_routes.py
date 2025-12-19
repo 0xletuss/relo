@@ -77,7 +77,7 @@ async def get_cart(
     """Get current user's cart"""
     try:
         logger.info(f"Fetching cart for user {current_user.id}")
-        cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
+        cart_items = db.query(Cart).filter(Cart.user_id == current_user.id).all()
         logger.info(f"Found {len(cart_items)} cart items")
         
         response = calculate_cart_response(cart_items, db)
@@ -121,7 +121,7 @@ async def add_to_cart(
         
         # Check if item already exists in cart
         existing_cart_item = db.query(Cart).filter(
-            Cart.customer_id == current_user.id,
+            Cart.user_id == current_user.id,
             Cart.product_id == request.product_id
         ).first()
         
@@ -136,7 +136,7 @@ async def add_to_cart(
             # Create new cart item
             logger.info(f"Creating new cart item")
             new_cart_item = Cart(
-                customer_id=current_user.id,
+                user_id=current_user.id,
                 product_id=request.product_id,
                 quantity=request.quantity
             )
@@ -155,7 +155,7 @@ async def add_to_cart(
         
         # Get updated cart
         logger.info("Fetching updated cart...")
-        cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
+        cart_items = db.query(Cart).filter(Cart.user_id == current_user.id).all()
         logger.info(f"Retrieved {len(cart_items)} cart items after add")
         
         cart_response = calculate_cart_response(cart_items, db)
@@ -189,7 +189,7 @@ async def update_cart_item(
         # Find cart item
         cart_item = db.query(Cart).filter(
             Cart.id == cart_item_id,
-            Cart.customer_id == current_user.id
+            Cart.user_id == current_user.id
         ).first()
         
         if not cart_item:
@@ -206,7 +206,7 @@ async def update_cart_item(
         logger.info(f"Cart item {cart_item_id} updated successfully")
         
         # Get updated cart
-        cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
+        cart_items = db.query(Cart).filter(Cart.user_id == current_user.id).all()
         cart_response = calculate_cart_response(cart_items, db)
         
         return CartActionResponse(
@@ -237,7 +237,7 @@ async def remove_from_cart(
         # Find cart item
         cart_item = db.query(Cart).filter(
             Cart.id == cart_item_id,
-            Cart.customer_id == current_user.id
+            Cart.user_id == current_user.id
         ).first()
         
         if not cart_item:
@@ -253,7 +253,7 @@ async def remove_from_cart(
         logger.info(f"Cart item {cart_item_id} deleted successfully")
         
         # Get updated cart
-        cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
+        cart_items = db.query(Cart).filter(Cart.user_id == current_user.id).all()
         cart_response = calculate_cart_response(cart_items, db)
         
         return CartActionResponse(
@@ -281,7 +281,7 @@ async def clear_cart(
         logger.info(f"Clearing cart for user {current_user.id}")
         
         # Delete all cart items
-        deleted_count = db.query(Cart).filter(Cart.customer_id == current_user.id).delete()
+        deleted_count = db.query(Cart).filter(Cart.user_id == current_user.id).delete()
         db.commit()
         logger.info(f"Cleared {deleted_count} items from cart")
         

@@ -76,13 +76,12 @@ class Category(Base):
             "image_url": self.image_url,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
-
 class Cart(Base):
     __tablename__ = "cart"
     __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    customer_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     quantity = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -94,7 +93,7 @@ class Cart(Base):
     def to_dict(self):
         return {
             "id": self.id,
-            "customer_id": self.customer_id,
+            "user_id": self.user_id,
             "product_id": self.product_id,
             "quantity": self.quantity,
             "product": self.product.to_dict() if self.product else None,
@@ -107,7 +106,7 @@ class Wishlist(Base):
     __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, index=True)
-    customer_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     product_id = Column(Integer, ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -117,7 +116,7 @@ class Wishlist(Base):
     def to_dict(self):
         return {
             "id": self.id,
-            "customer_id": self.customer_id,
+            "user_id": self.user_id,
             "product_id": self.product_id,
             "product": self.product.to_dict() if self.product else None,
             "created_at": self.created_at.isoformat() if self.created_at else None
