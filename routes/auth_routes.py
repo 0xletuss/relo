@@ -8,9 +8,14 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import List, Optional
 import os
+import logging
 
 router = APIRouter()
 security = HTTPBearer()
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Security configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-this-in-production")
@@ -168,6 +173,8 @@ async def get_current_user(
 async def sign_up(user_data: UserSignUp, db: Session = Depends(get_db)):
     """Sign up endpoint - accessible via both /signup and /register"""
     try:
+        logger.info(f"Registration attempt for username: {user_data.username}, role: {user_data.role}")
+        
         # Check if username already exists
         if get_user_by_username(db, user_data.username):
             raise HTTPException(
@@ -205,34 +212,58 @@ async def sign_up(user_data: UserSignUp, db: Session = Depends(get_db)):
         db.add(new_user)
         db.flush()  # Flush to get the user ID
         
-        # Create corresponding seller or customer record
+        logger.info(f"User created with ID: {new_user.id}")
+        
+        # CRITICAL FIX: Check if seller/customer already exists before creating
         if role == 'seller':
-            new_seller = Seller(
-                user_id=new_user.id,
-                business_name=user_data.full_name or user_data.username,
-                verified=False,
-                created_at=datetime.utcnow()
-            )
-            db.add(new_seller)
-        else:  # customer
-            # Parse full_name if provided
-            first_name = None
-            last_name = None
-            if user_data.full_name:
-                name_parts = user_data.full_name.split(' ', 1)
-                first_name = name_parts[0]
-                last_name = name_parts[1] if len(name_parts) > 1 else None
+            # Check if seller profile already exists for this user_id
+            existing_seller = db.query(Seller).filter(Seller.user_id == new_user.id).first()
             
-            new_customer = Customer(
-                user_id=new_user.id,
-                first_name=first_name,
-                last_name=last_name,
-                created_at=datetime.utcnow()
-            )
-            db.add(new_customer)
+            if existing_seller:
+                logger.warning(f"Seller profile already exists for user_id {new_user.id}")
+                # Use existing seller instead of creating new one
+            else:
+                # Create new seller profile
+                new_seller = Seller(
+                    user_id=new_user.id,
+                    business_name=user_data.full_name or user_data.username,
+                    verified=False,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(new_seller)
+                logger.info(f"Created seller profile for user_id {new_user.id}")
+        else:  # customer
+            # Check if customer profile already exists for this user_id
+            existing_customer = db.query(Customer).filter(Customer.user_id == new_user.id).first()
+            
+            if existing_customer:
+                logger.warning(f"Customer profile already exists for user_id {new_user.id}")
+                # Use existing customer instead of creating new one
+            else:
+                # Parse full_name if provided
+                first_name = None
+                last_name = None
+                if user_data.full_name:
+                    name_parts = user_data.full_name.split(' ', 1)
+                    first_name = name_parts[0]
+                    last_name = name_parts[1] if len(name_parts) > 1 else None
+                
+                # Create new customer profile
+                new_customer = Customer(
+                    user_id=new_user.id,
+                    first_name=first_name,
+                    last_name=last_name,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(new_customer)
+                logger.info(f"Created customer profile for user_id {new_user.id}")
         
         db.commit()
         db.refresh(new_user)
+        
+        logger.info(f"✅ User registration completed successfully: {new_user.username}")
         
         # Create tokens
         access_token = create_access_token(
@@ -251,13 +282,12 @@ async def sign_up(user_data: UserSignUp, db: Session = Depends(get_db)):
             access_token=access_token,
             refresh_token=refresh_token
         )
+        
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        print(f"Error during signup: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"❌ Error during signup: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error creating account: {str(e)}"
