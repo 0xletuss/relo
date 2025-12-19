@@ -1,5 +1,6 @@
 # =====================================================
-# routes/product_routes.py - CLEANED (Cart endpoints removed)
+# routes/product_routes.py - Products and Wishlist Only
+# Orders have been moved to routes/order_routes.py
 # =====================================================
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,10 +9,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from models.database import get_db
 from models.product_model import Product, Category, Wishlist
-from models.order import Order, OrderItem
 from routes.auth_routes import get_current_user
-import random
-import string
 from datetime import datetime
 import logging
 
@@ -99,48 +97,6 @@ class WishlistItemResponse(BaseModel):
 class WishlistResponse(BaseModel):
     items: List[WishlistItemResponse]
     count: int
-
-
-class OrderItemResponse(BaseModel):
-    id: int
-    order_id: int
-    product_id: int
-    quantity: int
-    price: float
-    subtotal: float
-    product: ProductResponse
-
-    class Config:
-        from_attributes = True
-
-
-class OrderResponse(BaseModel):
-    id: int
-    customer_id: int
-    order_number: str
-    total_amount: float
-    status: Optional[str] = None
-    shipping_address: Optional[str] = None
-    billing_address: Optional[str] = None
-    payment_method: Optional[str] = None
-    notes: Optional[str] = None
-    order_items: List[OrderItemResponse] = []
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
-
-
-class OrderCreate(BaseModel):
-    shipping_address: str
-    billing_address: Optional[str] = None
-    payment_method: str
-    notes: Optional[str] = None
-
-
-class OrdersListResponse(BaseModel):
-    orders: List[OrderResponse]
 
 
 # =====================================================
@@ -454,137 +410,6 @@ async def remove_from_wishlist(
 
 
 # =====================================================
-# Order Endpoints
+# NOTE: Order endpoints have been moved to routes/order_routes.py
+# Use /api/orders instead (handled by order_routes.py)
 # =====================================================
-
-def generate_order_number() -> str:
-    """Generate unique order number"""
-    timestamp = datetime.now().strftime("%Y%m%d")
-    random_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    return f"ORD-{timestamp}-{random_str}"
-
-
-@router.post("/orders", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
-async def create_order(
-    order_data: OrderCreate,
-    current_user = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Create order from cart items"""
-    try:
-        # Import Cart here to avoid circular imports
-        from models.product_model import Cart
-        
-        # Get cart items
-        cart_items = db.query(Cart)\
-            .filter(Cart.customer_id == current_user.id)\
-            .all()
-        
-        if not cart_items:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cart is empty. Cannot create order."
-            )
-        
-        # Calculate total
-        total_amount = sum(item.product.price * item.quantity for item in cart_items)
-        
-        # Create order
-        new_order = Order(
-            customer_id=current_user.id,
-            order_number=generate_order_number(),
-            total_amount=total_amount,
-            shipping_address=order_data.shipping_address,
-            billing_address=order_data.billing_address or order_data.shipping_address,
-            payment_method=order_data.payment_method,
-            notes=order_data.notes,
-            status="pending"
-        )
-        db.add(new_order)
-        db.flush()
-        
-        # Create order items
-        for cart_item in cart_items:
-            order_item = OrderItem(
-                order_id=new_order.id,
-                product_id=cart_item.product_id,
-                quantity=cart_item.quantity,
-                price=cart_item.product.price,
-                subtotal=cart_item.product.price * cart_item.quantity
-            )
-            db.add(order_item)
-        
-        # Clear cart
-        db.query(Cart).filter(Cart.customer_id == current_user.id).delete()
-        
-        db.commit()
-        db.refresh(new_order)
-        logger.info(f"Order created: {new_order.order_number}")
-        return new_order
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error creating order: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create order: {str(e)}"
-        )
-
-
-@router.get("/orders", response_model=OrdersListResponse)
-async def get_orders(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
-    current_user = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Get current user's orders"""
-    try:
-        orders = db.query(Order)\
-            .filter(Order.customer_id == current_user.id)\
-            .order_by(Order.created_at.desc())\
-            .offset(skip)\
-            .limit(limit)\
-            .all()
-        
-        return OrdersListResponse(orders=orders)
-    
-    except Exception as e:
-        logger.error(f"Error fetching orders: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch orders: {str(e)}"
-        )
-
-
-@router.get("/orders/{order_id}", response_model=OrderResponse)
-async def get_order(
-    order_id: int,
-    current_user = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """Get specific order details"""
-    try:
-        order = db.query(Order).filter(
-            Order.id == order_id,
-            Order.customer_id == current_user.id
-        ).first()
-        
-        if not order:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Order with ID {order_id} not found"
-            )
-        
-        return order
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error fetching order: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch order: {str(e)}"
-        )
