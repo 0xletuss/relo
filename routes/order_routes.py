@@ -136,7 +136,7 @@ async def create_order(
         logger.info(f"Creating order - User ID: {current_user.id}, Customer ID: {customer_id}")
         
         # STEP 3: Get cart items using current_user.id (because Cart.customer_id = users.id)
-        cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
+        cart_items = db.query(Cart).filter(Cart.user_id == current_user.id).all()
         
         if not cart_items:
             raise HTTPException(
@@ -202,7 +202,7 @@ async def create_order(
             db.add(order_item)
         
         # STEP 9: Clear cart after order creation (using current_user.id)
-        deleted_count = db.query(Cart).filter(Cart.customer_id == current_user.id).delete()
+        deleted_count = db.query(Cart).filter(Cart.user_id == current_user.id).delete()
         logger.info(f"Cleared {deleted_count} items from cart for user {current_user.id}")
         
         # STEP 10: Commit transaction
@@ -488,7 +488,7 @@ async def checkout_summary(
         logger.info(f"Fetching checkout summary - User ID: {current_user.id}, Customer ID: {customer_id}")
         
         # Get cart items (Cart.customer_id actually references users.id)
-        cart_items = db.query(Cart).filter(Cart.customer_id == current_user.id).all()
+        cart_items = db.query(Cart).filter(Cart.user_id == current_user.id).all()
         
         if not cart_items:
             raise HTTPException(
